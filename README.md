@@ -9,6 +9,8 @@ virtualenv env -p python3
 source env/bin/activate
 pip install -r requirements.txt
 cd starwars_universe
+python manage.py makemigrations
+python manage.py migrate
 python manage.py runserver
 ```
 ### Run query and mutation tests
