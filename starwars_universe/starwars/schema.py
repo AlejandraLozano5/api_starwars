@@ -2,30 +2,38 @@ import graphene
 from graphene import relay, ObjectType
 from graphene_django import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
+from graphql import GraphQLError
 
 from starwars.models import *
 
 class PlanetNode(DjangoObjectType):
+    """Class to define the node interface for the planet model. """
     class Meta:
         model = Planet
         filter_fields = ['name']
         interfaces = (relay.Node, )
 
 class MovieNode(DjangoObjectType):
+    """Class to define the node interface for the movie model. """
     class Meta:
         model = Movie
         filter_fields = ['name']
         interfaces = (relay.Node, )
 
-class PersonageNode(DjangoObjectType):
+class CharacterNode(DjangoObjectType):
+    """Class to define the node interface for the character model. """
     class Meta:
-        model = Personage
+        model = Character
         # Allow for some more advanced filtering here
         filter_fields = {
             'name': ['exact', 'icontains', 'istartswith'],
         }
         interfaces = (relay.Node, )
+
+# FOR QUERYS
 class Query(graphene.ObjectType):
+    """Class to define the querys of the starwars application"""
+    
     planet = relay.Node.Field(PlanetNode)
     all_planets = DjangoFilterConnectionField(PlanetNode)
 
@@ -33,15 +41,35 @@ class Query(graphene.ObjectType):
     all_movies = DjangoFilterConnectionField(MovieNode)
 
 
-    personage = relay.Node.Field(PersonageNode)
-    all_personages = DjangoFilterConnectionField(PersonageNode)
+    character = relay.Node.Field(CharacterNode)
+    all_characters = DjangoFilterConnectionField(CharacterNode)
 
-#For mutations
+
 class PlanetInput(graphene.InputObjectType):
+    """Class to define input arguments for planet mutation. """
+    
     id = graphene.ID()
     name = graphene.String(required=True)
 
+class MovieInput(graphene.InputObjectType):
+    """Class to define input arguments for movie mutation. """
+
+    id = graphene.ID()
+    name = graphene.String()
+    opening_text = graphene.String()
+    planets = graphene.List(PlanetInput)
+    director = graphene.String()
+    producer = graphene.String()
+
+class CharacterInput(graphene.InputObjectType):
+    """Class to define input arguments for character mutation. """
+    id = graphene.ID()
+    name = graphene.String()
+    movies = graphene.List(MovieInput)
+
+#FOR MUTATIONS
 class CreatePlanet(graphene.Mutation):
+    """Class to define the mutation that creates a planet. """
     class Arguments:
         planet_data = PlanetInput(required=True)
 
@@ -50,22 +78,20 @@ class CreatePlanet(graphene.Mutation):
 
     @staticmethod
     def mutate(root, info, planet_data=None):
-        print('Doing mutation of planet')
-        #planet = Planet(name=name)  
-        #planet = Planet.objects.create(**planet_data)
+        print('Doing mutation of PLANET')
+        user = info.context.user
+        print('User: ', user)
+        if user.is_anonymous:
+            print('Authentication is required')
+            raise GraphQLError('You must be authenticated to create a planet!')
+
         planet = Planet.objects.create(name=planet_data.name)
         ok = True
         return CreatePlanet(planet=planet, ok=ok)
 
-class MovieInput(graphene.InputObjectType):
-    id = graphene.ID()
-    name = graphene.String()
-    opening_text = graphene.String()
-    planets = graphene.List(PlanetInput)
-    director = graphene.String()
-    producer = graphene.String()
 
 class CreateMovie(graphene.Mutation):
+    """Class to define the mutation that creates a movie. """
     class Arguments:
         movie_data = MovieInput(required=True)
     
@@ -75,6 +101,12 @@ class CreateMovie(graphene.Mutation):
     @staticmethod
     def mutate(root, info, movie_data=None):
         print('Doing mutation of MOVIE')
+        user = info.context.user
+        print('User: ', user)
+        if user.is_anonymous:
+            print('Authentication is required')
+            raise GraphQLError('You must be authenticated to create a movie!')
+
         ok = True
         planets = []
         for planet_input in movie_data.planets:
@@ -88,35 +120,40 @@ class CreateMovie(graphene.Mutation):
         
         return CreateMovie(movie=movie, ok=ok)
 
-class PersonageInput(graphene.InputObjectType):
-    id = graphene.ID()
-    name = graphene.String()
-    movies = graphene.List(MovieInput)
 
-class CreatePersonage(graphene.Mutation):
+class CreateCharacter(graphene.Mutation):
+    """Class to define the mutation that creates a character. """
     class Arguments:
-        personage_data = PersonageInput(required=True)
+        character_data = CharacterInput(required=True)
     
     ok = graphene.Boolean()
-    personage = graphene.Field(PersonageNode)
+    character = graphene.Field(CharacterNode)
 
     @staticmethod
-    def mutate(root, info, personage_data=None):
-        print('Doing mutation of PERSONAGE')
+    def mutate(root, info, character_data=None):
+        print('Doing mutation of CHARACTER')
+
+        user = info.context.user
+        print('User: ', user)
+        if user.is_anonymous:
+            print('Authentication is required')
+            raise GraphQLError('You must be authenticated to create a character!')
+
         ok = True
         movies = []
-        for movie_input in personage_data.movies:
+        for movie_input in character_data.movies:
             movie = Movie.objects.get(id=movie_input.id)
             if movie is None:
-                return CreatePersonage(movie=None, ok=False)
+                return CreateCharacter(character=None, ok=False)
             movies.append(movie)
-        personage = Personage.objects.create(name=personage_data.name)
-        personage.movies.set(movies)
+        character = Character.objects.create(name=character_data.name)
+        character.movies.set(movies)
         
-        return CreatePersonage(personage=personage, ok=ok)
+        return CreateCharacter(character=character, ok=ok)
 
-class MyMutations(graphene.ObjectType):
+class Mutation(graphene.ObjectType):
+    """ Mutations for starwars app. """
     create_planet = CreatePlanet.Field()
     create_movie = CreateMovie.Field()
-    create_personage = CreatePersonage.Field()
+    create_character = CreateCharacter.Field()
 

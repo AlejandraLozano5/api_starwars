@@ -4,4 +4,4 @@ from .models import *
 # Register your models here.
 admin.site.register(Planet)
 admin.site.register(Movie)
-admin.site.register(Personage)
+admin.site.register(Character)

@@ -3,6 +3,9 @@ from django.test import TestCase
 from mixer.backend.django import mixer
 from graphene.test import Client
 
+from django.contrib.auth import get_user_model
+from graphql_jwt.testcases import JSONWebTokenTestCase
+
 from starwars.models import *
 from starwars_universe.schema import schema
 
@@ -29,10 +32,10 @@ create_movie_mutation = """
         }
     }
 """
-create_personage_mutation = """
-    mutation CreatePersonage($input: PersonageInput!){
-        createPersonage(personageData: $input) {
-            personage{
+create_character_mutation = """
+    mutation CreateCharacter($input: CharacterInput!){
+        createCharacter(characterData: $input) {
+            character{
                 id
                 name
             }
@@ -40,9 +43,9 @@ create_personage_mutation = """
         }
     }
 """
-personage_filter_query = """
+character_filter_query = """
     query($name:String!){
-        allPersonages(name_Icontains:$name){
+        allCharacters(name_Icontains:$name){
             edges {
                 node {
                     id
@@ -55,7 +58,7 @@ personage_filter_query = """
 
 all_list_query = """
     query {
-        allPersonages {
+        allCharacters {
             edges {
                 node {
                     name,
@@ -80,47 +83,34 @@ all_list_query = """
 """
 
 @pytest.mark.django_db
-class TestSchema(TestCase):
+class TestSchema(JSONWebTokenTestCase):
     def setUp(self):
-        print('SET UP')
-        self.client = Client(schema)
-
-    def test_personage_filter_query(self):
-        print('def test_personage_filter_query')
-        personage = mixer.blend(Personage)
-        response = self.client.execute(personage_filter_query, variables={"name": personage.name })
-        print('Response: ', response)
-        response_personage = response.get("data").get("allPersonages").get("edges")
-        for i in response_personage:
-            assert i['node']["name"] == str(personage.name)
-
-    def test_all_list_query(self):
-        print('def test_all_list_query')
-        mixer.blend(Personage)
-        mixer.blend(Personage)
-
-        response = self.client.execute(all_list_query)
-        print('Response: ', response)
-        personage = response.get("data").get("allPersonages").get("edges")
-        assert len(personage)
+        """Define initial params. """
+        #self.client = Client(schema)
+        self.user = get_user_model().objects.create(username='test')
+        self.client.authenticate(self.user)
 
     def test_create_planet(self):
+        """Test function to create a planet. """
+
         print('def test_create_planet')
         payload = {
             "name": "Umbara"
         }
-
         response = self.client.execute(create_planet_mutation, variables={"input": payload})
         print('Response: ', response)
-        planet = response.get("data").get("createPlanet").get("planet")
+        print("Response.data: ", response.data)
+        print("Response.data.get(createPlanet): ", response.data.get("createPlanet"))
+        planet = response.data.get("createPlanet").get("planet")
         name = planet.get("name")
         assert name == payload["name"]
 
     def test_create_movie(self):
+        """Test function to create a movie. """
+
         print('def test_create_movie')
         planet1 = mixer.blend(Planet)
         planet2 = mixer.blend(Planet)
-
         payload = {
             "name": "Episodio I - La amenaza fantasma",
             "openingText": "La República Galáctica está sumida en el caos. Los impuestos de las rutas comerciales a los sistemas estelares exteriores están en disputa.  Esperando resolver el asunto con un bloqueo de poderosas naves de guerra, la codiciosa Federación de Comercio ha detenido todos los envíos al pequeño planeta de Naboo.  Mientras el Congreso de la República debate interminablemente esta alarmante cadena de acontecimientos, el Canciller Supremo ha enviado en secreto a dos Caballeros Jedi, guardianes de la paz y la justicia en la galaxia, para resolver el conflicto....",
@@ -134,15 +124,16 @@ class TestSchema(TestCase):
 
         response = self.client.execute(create_movie_mutation, variables={"input": payload})
         print('Response: ', response)
-        movie = response.get("data").get("createMovie").get("movie")
+        movie = response.data.get("createMovie").get("movie")
         name = movie.get("name")
         assert name == payload["name"]
 
-    def test_create_personage(self):
-        print('def test_create_personage')
+    def test_create_character(self):
+        """Test function to create a character. """
+
+        print('def test_create_character')
         movie1 = mixer.blend(Movie)
         movie2 = mixer.blend(Movie)
-
         payload = {
             "name": "Anakin Skywalker",
             "movies": [
@@ -150,9 +141,31 @@ class TestSchema(TestCase):
                 {"id": movie2.id}
             ]
         }
-        
-        response = self.client.execute(create_personage_mutation, variables={"input": payload})
+        response = self.client.execute(create_character_mutation, variables={"input": payload})
         print('Response: ', response)
-        personage = response.get("data").get("createPersonage").get("personage")
-        name = personage.get("name")
+        print('Response.data: ', response.data)
+        character = response.data.get("createCharacter").get("character")
+        name = character.get("name")
         assert name == payload["name"]
+    
+    def test_character_filter_query(self):
+        """Function that tests a character query with name filter. """
+        
+        print('def test_character_filter_query')
+        character = mixer.blend(Character)
+        response = self.client.execute(character_filter_query, variables={"name": character.name })
+        print('Response: ', response)
+        response_character = response.data.get("allCharacters").get("edges")
+        for i in response_character:
+            assert i['node']["name"] == str(character.name)
+
+    def test_all_list_query(self):
+        """Function that tests a query of all the characters with the respective films in which they appeared and these in turn with their planets. """
+        
+        print('def test_all_list_query')
+        mixer.blend(Character)
+        mixer.blend(Character)
+        response = self.client.execute(all_list_query)
+        print('Response: ', response)
+        character = response.data.get("allCharacters").get("edges")
+        assert len(character)
