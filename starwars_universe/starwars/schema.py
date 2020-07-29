@@ -3,7 +3,7 @@ from graphene import relay, ObjectType
 from graphene_django import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
 
-from .models import *
+from starwars.models import *
 
 class PlanetNode(DjangoObjectType):
     class Meta:
@@ -35,41 +35,10 @@ class Query(graphene.ObjectType):
 
     personage = relay.Node.Field(PersonageNode)
     all_personages = DjangoFilterConnectionField(PersonageNode)
-    
-    """
-    planets = graphene.List(PlanetType)
-    movies = graphene.List(MovieType)
-    personages = graphene.List(PersonageType)
-
-    def resolve_planets(self, infor, **kwargs):
-        return Planet.objects.all()
-
-    def resolve_movies(self, infor, **kwargs):
-        #return Movie.objects.select_related('planet').all()
-        return Movie.objects.all()
-    
-    def resolve_personages(self, infor, **kwargs):
-        return Personage.objects.all()
-    """
 
 #For mutations
-"""
-class CreatePlanet(graphene.Mutation):
-    class Arguments:
-        name = graphene.String(required=True)
-
-    ok = graphene.Boolean()
-    planet = graphene.Field(PlanetNode)
-
-    @staticmethod
-    def mutate(root, info, name):
-        print('Doing mutation of planet')
-        #planet = Planet(name=name)  
-        planet = Planet.objects.create(name=name)
-        ok = True
-        return CreatePlanet(planet=planet, ok=ok)
-"""
 class PlanetInput(graphene.InputObjectType):
+    id = graphene.ID()
     name = graphene.String(required=True)
 
 class CreatePlanet(graphene.Mutation):
@@ -110,6 +79,7 @@ class CreateMovie(graphene.Mutation):
         planets = []
         for planet_input in movie_data.planets:
             planet = Planet.objects.get(name=planet_input.name)
+            #planet = Planet.objects.get(id=planet_input.id)
             if planet is None:
                 return CreateMovie(movie=None, ok=False)
             planets.append(planet)
